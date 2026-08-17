@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.2.0';
+  var VERSION = '0.2.1';
   var ROOT_ID = 'emcore-todo-proof';
   var CSS_ID = 'emcore-todo-css';
   var state = {

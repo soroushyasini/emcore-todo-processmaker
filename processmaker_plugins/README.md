@@ -9,5 +9,5 @@ module.
 - rollback.ps1 restores the immediately preceding deployment.
 - DEPLOYMENT.md is the operational guide.
 
-Version 0.2.0 stores private per-user tasks in emcore_todo_tasks. Rollback
+Version 0.2.1 stores private per-user tasks in emcore_todo_tasks. Rollback
 preserves that table and its data.

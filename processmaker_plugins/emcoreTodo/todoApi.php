@@ -54,14 +54,16 @@ function emcore_todo_current_user($db)
         throw new EmcoreTodoHttpException(401, 'ورود به سامانه الزامی است');
     }
 
-    $statement = $db->prepare(
-        "SELECT USR_UID, USR_USERNAME, USR_FIRSTNAME, USR_LASTNAME
+    $user = $db->selectOne(
+        "SELECT USR_UID AS usr_uid,
+                USR_USERNAME AS usr_username,
+                USR_FIRSTNAME AS usr_firstname,
+                USR_LASTNAME AS usr_lastname
          FROM USERS
          WHERE USR_UID = :usr_uid AND USR_STATUS = 'ACTIVE'
-         LIMIT 1"
+         LIMIT 1",
+        [':usr_uid' => $usrUid]
     );
-    $statement->execute([':usr_uid' => $usrUid]);
-    $user = $statement->fetch(PDO::FETCH_ASSOC);
     if (!$user) {
         throw new EmcoreTodoHttpException(401, 'کاربر فعال یافت نشد');
     }
@@ -169,15 +171,14 @@ function emcore_todo_completed()
 
 function emcore_todo_fetch($db, $id, $usrUid)
 {
-    $statement = $db->prepare(
+    $task = $db->selectOne(
         "SELECT id, title, notes, priority, due_date_fa, is_completed,
                 sort_order, completed_at, created_at, updated_at
          FROM " . EmcoreTodoRepository::TABLE . "
          WHERE id = :id AND usr_uid = :usr_uid AND deleted_at IS NULL
-         LIMIT 1"
+         LIMIT 1",
+        [':id' => $id, ':usr_uid' => $usrUid]
     );
-    $statement->execute([':id' => $id, ':usr_uid' => $usrUid]);
-    $task = $statement->fetch(PDO::FETCH_ASSOC);
     if (!$task) {
         throw new EmcoreTodoHttpException(404, 'کار موردنظر یافت نشد');
     }
@@ -190,11 +191,11 @@ function emcore_todo_fetch($db, $id, $usrUid)
 
 $db = EmcoreTodoRepository::connection();
 $user = emcore_todo_current_user($db);
-$usrUid = $user['USR_UID'];
+$usrUid = $user['usr_uid'];
 $action = emcore_todo_action();
 
 if ($action === 'list') {
-    $statement = $db->prepare(
+    $tasks = $db->selectAll(
         "SELECT id, title, notes, priority, due_date_fa, is_completed,
                 sort_order, completed_at, created_at, updated_at
          FROM " . EmcoreTodoRepository::TABLE . "
@@ -205,10 +206,9 @@ if ($action === 'list') {
                   priority DESC,
                   sort_order ASC,
                   id DESC
-         LIMIT 500"
+         LIMIT 500",
+        [':usr_uid' => $usrUid]
     );
-    $statement->execute([':usr_uid' => $usrUid]);
-    $tasks = $statement->fetchAll(PDO::FETCH_ASSOC);
     foreach ($tasks as &$task) {
         $task['id'] = (int)$task['id'];
         $task['priority'] = (int)$task['priority'];
@@ -222,8 +222,8 @@ if ($action === 'list') {
         'data' => $tasks,
         'csrf_token' => emcore_todo_csrf_token(),
         'user' => [
-            'first_name' => $user['USR_FIRSTNAME'],
-            'last_name' => $user['USR_LASTNAME'],
+            'first_name' => $user['usr_firstname'],
+            'last_name' => $user['usr_lastname'],
         ],
     ]);
 }
@@ -236,40 +236,39 @@ if ($action === 'create') {
     $priority = emcore_todo_priority();
     $dueDate = emcore_todo_due_date();
 
-    $statement = $db->prepare(
+    $id = $db->insert(
         "INSERT INTO " . EmcoreTodoRepository::TABLE . "
             (usr_uid, title, notes, priority, due_date_fa, is_completed, sort_order)
          VALUES
-            (:usr_uid, :title, :notes, :priority, :due_date_fa, 0, 0)"
+            (:usr_uid, :title, :notes, :priority, :due_date_fa, 0, 0)",
+        [
+            ':usr_uid' => $usrUid,
+            ':title' => $title,
+            ':notes' => $notes,
+            ':priority' => $priority,
+            ':due_date_fa' => $dueDate,
+        ]
     );
-    $statement->execute([
-        ':usr_uid' => $usrUid,
-        ':title' => $title,
-        ':notes' => $notes,
-        ':priority' => $priority,
-        ':due_date_fa' => $dueDate,
-    ]);
-    $id = (int)$db->lastInsertId();
     emcore_todo_json(['success' => true, 'data' => emcore_todo_fetch($db, $id, $usrUid)], 201);
 }
 
 if ($action === 'toggle') {
     $id = emcore_todo_id();
     $completed = emcore_todo_completed();
-    $statement = $db->prepare(
+    $affected = $db->execute(
         "UPDATE " . EmcoreTodoRepository::TABLE . "
          SET is_completed = :completed,
              completed_at = IF(:completed_for_date = 1, NOW(), NULL),
              updated_at = NOW()
-         WHERE id = :id AND usr_uid = :usr_uid AND deleted_at IS NULL"
+         WHERE id = :id AND usr_uid = :usr_uid AND deleted_at IS NULL",
+        [
+            ':completed' => $completed,
+            ':completed_for_date' => $completed,
+            ':id' => $id,
+            ':usr_uid' => $usrUid,
+        ]
     );
-    $statement->execute([
-        ':completed' => $completed,
-        ':completed_for_date' => $completed,
-        ':id' => $id,
-        ':usr_uid' => $usrUid,
-    ]);
-    if ($statement->rowCount() === 0) {
+    if ($affected === 0) {
         emcore_todo_fetch($db, $id, $usrUid);
     }
     emcore_todo_json(['success' => true, 'data' => emcore_todo_fetch($db, $id, $usrUid)]);
@@ -277,13 +276,13 @@ if ($action === 'toggle') {
 
 if ($action === 'delete') {
     $id = emcore_todo_id();
-    $statement = $db->prepare(
+    $affected = $db->execute(
         "UPDATE " . EmcoreTodoRepository::TABLE . "
          SET deleted_at = NOW(), updated_at = NOW()
-         WHERE id = :id AND usr_uid = :usr_uid AND deleted_at IS NULL"
+         WHERE id = :id AND usr_uid = :usr_uid AND deleted_at IS NULL",
+        [':id' => $id, ':usr_uid' => $usrUid]
     );
-    $statement->execute([':id' => $id, ':usr_uid' => $usrUid]);
-    if ($statement->rowCount() === 0) {
+    if ($affected === 0) {
         throw new EmcoreTodoHttpException(404, 'کار موردنظر یافت نشد');
     }
     emcore_todo_json(['success' => true]);
@@ -295,24 +294,24 @@ $notes = emcore_todo_text('notes', false, 2000);
 $priority = emcore_todo_priority();
 $dueDate = emcore_todo_due_date();
 
-$statement = $db->prepare(
+$affected = $db->execute(
     "UPDATE " . EmcoreTodoRepository::TABLE . "
      SET title = :title,
          notes = :notes,
          priority = :priority,
          due_date_fa = :due_date_fa,
          updated_at = NOW()
-     WHERE id = :id AND usr_uid = :usr_uid AND deleted_at IS NULL"
+     WHERE id = :id AND usr_uid = :usr_uid AND deleted_at IS NULL",
+    [
+        ':title' => $title,
+        ':notes' => $notes,
+        ':priority' => $priority,
+        ':due_date_fa' => $dueDate,
+        ':id' => $id,
+        ':usr_uid' => $usrUid,
+    ]
 );
-$statement->execute([
-    ':title' => $title,
-    ':notes' => $notes,
-    ':priority' => $priority,
-    ':due_date_fa' => $dueDate,
-    ':id' => $id,
-    ':usr_uid' => $usrUid,
-]);
-if ($statement->rowCount() === 0) {
+if ($affected === 0) {
     emcore_todo_fetch($db, $id, $usrUid);
 }
 emcore_todo_json(['success' => true, 'data' => emcore_todo_fetch($db, $id, $usrUid)]);
