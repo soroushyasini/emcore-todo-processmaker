@@ -1,74 +1,101 @@
-# EMCORE Todo Phase 1 proof plugin
+# EMCORE Todo 0.1.1
 
-This disposable proof verifies whether ProcessMaker 3.8.2 publishes a browser
-asset registered by an independent plugin into the custom `interface` pages.
-It contains no schema, database access, task API, user identifiers, tokens, or
-persistent browser storage.
+EMCORE Todo is a separate ProcessMaker 3.8 plugin that proves a private Todo
+launcher can be displayed in the custom EMCORE interface. This phase does not
+create tables, store tasks, or call an API.
 
-## Files deployed to ProcessMaker
+The custom interface does not consume ProcessMaker's shared HeadPublisher
+queue. Version 0.1.1 therefore keeps the plugin independent and installs one
+small, marked loader in the interface's existing shared functions file.
 
-Copy these two repository paths into `workflow/engine/plugins/`:
+## Automated deployment
 
-```text
-processmaker_plugins/emcoreTodo.php  -> workflow/engine/plugins/emcoreTodo.php
-processmaker_plugins/emcoreTodo/     -> workflow/engine/plugins/emcoreTodo/
+Open PowerShell as Administrator:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+Set-Location "F:\codebase\emcore-todo-processmaker\processmaker_plugins"
+.\deploy.ps1 -ProcessMakerEngine "C:\pmlearning\bpms\workflow\engine"
 ```
 
-Do not copy the containing `processmaker_plugins` directory itself.
+The deployment script:
 
-## Test-instance installation
+- validates all source and target paths;
+- refuses to run while an earlier deployment state is unresolved;
+- backs up the previous plugin and interface functions file;
+- copies `emcoreTodo.php` and the `emcoreTodo` directory;
+- appends an idempotent, marked loader to
+  `interface/public_html/assets/core/functions.js`;
+- records the backup location in
+  `plugins/.emcoreTodo-deployment.json`.
 
-1. Confirm the ProcessMaker database and `workflow/engine/plugins` backup.
-2. Copy the entrypoint and directory to the paths above.
-3. In ProcessMaker, open **Admin > Plugins > Plugins Manager**.
-4. Enable **EMCORE Todo**. If it was already enabled, disable and enable it so
-   ProcessMaker refreshes plugin registration.
-5. Hard-refresh the browser (`Ctrl+F5`).
+It never edits encoded PHP or ProcessMaker core files.
 
-The expected result is a green **کارهای من** bubble at the lower-right of the
-outer interface. Clicking it shows a Persian confirmation card stating that no
-information is stored.
+After it succeeds:
 
-## Acceptance matrix
+1. Open **Admin > Plugins > Plugins Manager**.
+2. Disable and re-enable **EMCORE Todo**.
+3. Sign in as a regular user and press `Ctrl+F5`.
+4. Confirm the green **کارهای من** launcher appears at the bottom-right.
 
-Check the following routes in both the `default` and `material` themes where
-available:
+## Files deployed
 
-| Route/page | Expected result |
+```text
+processmaker_plugins/emcoreTodo.php
+  -> workflow/engine/plugins/emcoreTodo.php
+
+processmaker_plugins/emcoreTodo/
+  -> workflow/engine/plugins/emcoreTodo/
+
+marked loader
+  -> workflow/engine/plugins/interface/public_html/assets/core/functions.js
+```
+
+The browser-facing assets are served from:
+
+```text
+/plugin/emcoreTodo/todoWidget.js?v=0.1.1
+/plugin/emcoreTodo/todo-widget.css?v=0.1.1
+```
+
+## Acceptance checks
+
+Test the following pages in both available themes:
+
+| Page | Expected result |
 |---|---|
-| Dashboard (`index`) | One bubble in the outer page |
-| My cases (`my_cases`) | One bubble in the outer page |
-| Custom menu (`menu_open_case`) | One bubble outside `contentIframe` |
-| Dynaform inside `contentIframe` | No second bubble inside the frame |
-| Browser width below 600px | Compact icon-only bubble |
+| Dashboard | One launcher in the outer page |
+| My Cases | One launcher in the outer page |
+| Open Case | One launcher outside the content iframe |
+| Dynaform iframe | No duplicate launcher |
+| Browser below 600px | Compact icon-only launcher |
 
-Also confirm:
-
-- Escape closes the confirmation card.
-- The close button returns focus to the bubble.
-- Developer Tools > Network loads
-  `/plugin/emcoreTodo/todo-widget.css?v=0.1.0` with HTTP 200.
-- No requests are made to `/emcore_api/` in this phase.
-
-## If the bubble does not appear
-
-1. Confirm the plugin is enabled.
-2. Check the browser console for a JavaScript or Content Security Policy error.
-3. Search the rendered page source/network requests for `todoWidget.js`.
-4. Confirm the file exists at
-   `workflow/engine/plugins/emcoreTodo/todoWidget.js`.
-5. Record results for `index`, `my_cases`, and `menu_open_case` separately.
-
-Do not patch the vendor `interface` plugin yet. A missing widget means the
-encoded interface renderer did not consume the shared HeadPublisher asset; it
-does not justify changing the vendor bundle without reviewing the evidence.
+Also verify that Escape closes the panel and that Developer Tools shows HTTP
+200 for both browser-facing assets.
 
 ## Rollback
 
-1. Disable **EMCORE Todo** in Plugins Manager.
-2. Hard-refresh and verify the bubble is absent.
-3. If desired, remove only `workflow/engine/plugins/emcoreTodo.php` and
-   `workflow/engine/plugins/emcoreTodo/` after the plugin is disabled.
+Disable **EMCORE Todo** in Plugins Manager first. Then run:
 
-No database rollback is needed because Phase 1 creates no data.
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+Set-Location "F:\codebase\emcore-todo-processmaker\processmaker_plugins"
+.\rollback.ps1 -ProcessMakerEngine "C:\pmlearning\bpms\workflow\engine"
+```
 
+Rollback restores the exact interface functions file and plugin files captured
+by the latest deployment. If the plugin did not exist before deployment, it is
+removed. The timestamped backup remains under:
+
+```text
+workflow/engine/plugins/.emcoreTodo-backups/
+```
+
+No database rollback is required because version 0.1.1 stores no data.
+
+## Manual recovery
+
+If a deployment stops unexpectedly, do not run deployment again. Read
+`plugins/.emcoreTodo-deployment.json`, locate its `BackupDirectory`, and run
+`rollback.ps1`. The state file is written before plugin or interface files are
+changed, so rollback remains available after a partial deployment.
