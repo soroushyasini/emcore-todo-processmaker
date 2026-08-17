@@ -1,11 +1,7 @@
 <?php
 
 /**
- * EMCORE Todo global-widget proof plugin for ProcessMaker 3.8.
- *
- * Phase 1 deliberately contains no database access and no task API calls. Its
- * only job is to verify that an independent plugin can publish a browser asset
- * into the shared ProcessMaker page renderer.
+ * EMCORE Todo private personal task plugin for ProcessMaker 3.8.
  */
 
 G::LoadClass('plugin');
@@ -19,7 +15,7 @@ class emcoreTodoPlugin extends PMPlugin
         $this->sDescription = 'Private personal todo module for EMCORE';
         $this->sPluginFolder = 'emcoreTodo';
         $this->sSetupPage = '';
-        $this->iVersion = '0.1.1';
+        $this->iVersion = '0.2.0';
         $this->aWorkspaces = null;
         return $result;
     }
@@ -34,17 +30,24 @@ class emcoreTodoPlugin extends PMPlugin
 
     public function install()
     {
+        $this->ensureSchema();
     }
 
     public function enable()
     {
+        $this->ensureSchema();
     }
 
     public function disable()
     {
     }
+
+    private function ensureSchema()
+    {
+        require_once PATH_PLUGINS . $this->sPluginFolder . '/classes/class.todoRepository.php';
+        EmcoreTodoRepository::ensureSchema();
+    }
 }
 
 $pluginRegistry = &PMPluginRegistry::getSingleton();
 $pluginRegistry->registerPlugin('emcoreTodo', __FILE__);
-

@@ -1,10 +1,13 @@
 # ProcessMaker plugin deliverables
 
-This directory contains source-controlled plugins and deployment artifacts for
-the ProcessMaker 3.8 test environment. Each plugin keeps its entrypoint beside
-its same-named directory to mirror `workflow/engine/plugins/`.
+This directory mirrors workflow/engine/plugins/ for the standalone EMCORE Todo
+module.
 
-`emcoreTodo` is currently a data-free Phase 1 proof. Follow its own README and
-do not deploy it to production until the global asset hook and rollback have
-been verified on the test installation.
+- emcoreTodo.php is the ProcessMaker plugin entrypoint.
+- emcoreTodo/ contains the API, schema lifecycle, UI, and public assets.
+- deploy.ps1 performs installation or upgrade with timestamped backups.
+- rollback.ps1 restores the immediately preceding deployment.
+- DEPLOYMENT.md is the operational guide.
 
+Version 0.2.0 stores private per-user tasks in emcore_todo_tasks. Rollback
+preserves that table and its data.

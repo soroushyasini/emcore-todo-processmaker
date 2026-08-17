@@ -60,8 +60,19 @@ if ([bool]$state.HadPluginDirectory) {
     Copy-Item -LiteralPath $backupPluginDirectory -Destination $targetDirectory -Recurse -Force
 }
 
-Remove-Item -LiteralPath $stateFile -Force
+$hadPreviousState = $state.PSObject.Properties.Name -contains "HadDeploymentState" -and [bool]$state.HadDeploymentState
+if ($hadPreviousState) {
+    $previousState = Join-Path $backupDirectory "previous-deployment-state.json"
+    if (-not (Test-Path -LiteralPath $previousState)) {
+        throw "Previous deployment state not found: $previousState"
+    }
+    Copy-Item -LiteralPath $previousState -Destination $stateFile -Force
+}
+elseif (Test-Path -LiteralPath $stateFile) {
+    Remove-Item -LiteralPath $stateFile -Force
+}
 
 Write-Host "EMCORE Todo rollback completed." -ForegroundColor Green
 Write-Host "Backup retained for audit: $backupDirectory"
+Write-Host "Todo data was preserved; rollback never drops emcore_todo_tasks."
 Write-Host "Next: refresh Plugins Manager and press Ctrl+F5."
