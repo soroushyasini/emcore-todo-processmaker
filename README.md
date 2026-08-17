@@ -1,13 +1,16 @@
-# EMCORE Todo 0.2.1
+# EMCORE Todo 0.3.0
 
 EMCORE Todo is a private, self-managed task list for authenticated ProcessMaker
 3.8 users. It appears as a floating launcher throughout the custom EMCORE
 interface and keeps every task scoped to the current ProcessMaker USR_UID.
 
-## Phase 2 capabilities
+## Phase 3 capabilities
 
 - create, edit, complete, reopen, and soft-delete personal tasks;
-- optional Persian due date, priority, and notes;
+- dependency-free inline Shamsi date picker and optional due time;
+- day-based task groups for today, tomorrow, overdue, and unscheduled work;
+- visible due and created/completed timestamps on each task;
+- optional priority and notes;
 - open/all/completed filters and an outstanding-task badge;
 - same-origin ProcessMaker session authentication;
 - CSRF protection for every write;
@@ -56,17 +59,18 @@ git pull --ff-only
 
 The deployment script supports an existing 0.1.1 deployment. It creates a new
 timestamped backup, preserves the preceding rollback state, copies version
-0.2.1, and updates only the marked loader block.
+0.3.0, and updates only the marked loader block.
 
 After deployment:
 
 1. Open **Admin > Plugins > Plugins Manager**.
 2. Disable and re-enable **EMCORE Todo**.
-3. Confirm the plugin version is 0.2.1.
+3. Confirm the plugin version is 0.3.0.
 4. Sign in as a regular user and press Ctrl+F5.
 5. Open **کارهای من** and create a test task.
 
-Re-enabling runs the idempotent schema installation:
+Re-enabling runs the idempotent schema installation and adds the nullable
+`due_time` column to an existing Todo table:
 
 ~~~text
 emcore_todo_tasks
@@ -88,8 +92,8 @@ marked loader
 Browser assets:
 
 ~~~text
-/plugin/emcoreTodo/todoWidget.js?v=0.2.1
-/plugin/emcoreTodo/todo-widget.css?v=0.2.1
+/plugin/emcoreTodo/todoWidget.js?v=0.3.0
+/plugin/emcoreTodo/todo-widget.css?v=0.3.0
 ~~~
 
 Workspace API route:
@@ -122,6 +126,10 @@ Test with two different regular users:
 6. Dashboard, My Cases, Open Case, and both themes show one launcher.
 7. A Dynaform iframe does not show a second launcher.
 8. Narrow browser width shows the compact trigger and usable full-width panel.
+9. The Shamsi picker can select today, move between months, and clear a date.
+10. A saved due time returns after refresh and appears beside its due date.
+11. Tasks are grouped by due day, with unscheduled tasks in their own group.
+12. Created time is visible; completed tasks show their completion time.
 
 ## Rollback
 

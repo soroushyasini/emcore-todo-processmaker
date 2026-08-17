@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.2.1';
+  var VERSION = '0.3.0';
   var ROOT_ID = 'emcore-todo-proof';
   var CSS_ID = 'emcore-todo-css';
   var state = {
@@ -11,7 +11,10 @@
     loaded: false,
     loading: false,
     saving: false,
-    editingId: null
+    editingId: null,
+    calendarOpen: false,
+    calendarYear: null,
+    calendarMonth: null
   };
 
   if (window.top !== window.self || window.__EMCORE_TODO_LOADED__) {
@@ -35,6 +38,7 @@
       trash: '<path d="M6.5 8h11l-.7 11h-9.6L6.5 8Zm3-3h5l1 3h-7l1-3ZM5 8h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
       refresh: '<path d="M18.5 8.5A7 7 0 1 0 19 15M18.5 4v4.5H14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>',
       calendar: '<path d="M6 4v3M18 4v3M4.5 9h15M5 6h14a1 1 0 0 1 1 1v12H4V7a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+      clock: '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
       chevron: '<path d="m8 10 4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
       notebook: '<path d="M7 4.5h11v15H7a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Zm0 0v15M10 9h5M10 13h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
     };
@@ -113,6 +117,165 @@
     return priorities[value] || priorities[1];
   }
 
+  function integerDivision(a, b) {
+    return ~~(a / b);
+  }
+
+  function remainder(a, b) {
+    return a - integerDivision(a, b) * b;
+  }
+
+  function jalaliCalendar(jalaliYear) {
+    var breaks = [-61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178];
+    var gregorianYear = jalaliYear + 621;
+    var leapJalali = -14;
+    var previousBreak = breaks[0];
+    var currentBreak;
+    var jump = 0;
+    var leap;
+    var leapGregorian;
+    var march;
+    var distance;
+    var index;
+
+    if (jalaliYear < previousBreak || jalaliYear >= breaks[breaks.length - 1]) {
+      throw new Error('سال شمسی خارج از محدوده است');
+    }
+
+    for (index = 1; index < breaks.length; index += 1) {
+      currentBreak = breaks[index];
+      jump = currentBreak - previousBreak;
+      if (jalaliYear < currentBreak) {
+        break;
+      }
+      leapJalali += integerDivision(jump, 33) * 8 + integerDivision(remainder(jump, 33), 4);
+      previousBreak = currentBreak;
+    }
+
+    distance = jalaliYear - previousBreak;
+    leapJalali += integerDivision(distance, 33) * 8 + integerDivision(remainder(distance, 33) + 3, 4);
+    if (remainder(jump, 33) === 4 && jump - distance === 4) {
+      leapJalali += 1;
+    }
+
+    leapGregorian = integerDivision(gregorianYear, 4) -
+      integerDivision((integerDivision(gregorianYear, 100) + 1) * 3, 4) - 150;
+    march = 20 + leapJalali - leapGregorian;
+
+    if (jump - distance < 6) {
+      distance = distance - jump + integerDivision(jump + 4, 33) * 33;
+    }
+    leap = remainder(remainder(distance + 1, 33) - 1, 4);
+    if (leap === -1) {
+      leap = 4;
+    }
+
+    return { leap: leap, gregorianYear: gregorianYear, march: march };
+  }
+
+  function gregorianToDayNumber(year, month, day) {
+    var number = integerDivision(
+      (year + integerDivision(month - 8, 6) + 100100) * 1461,
+      4
+    ) + integerDivision(153 * remainder(month + 9, 12) + 2, 5) + day - 34840408;
+    number -= integerDivision(
+      integerDivision(year + 100100 + integerDivision(month - 8, 6), 100) * 3,
+      4
+    ) - 752;
+    return number;
+  }
+
+  function dayNumberToGregorian(dayNumber) {
+    var value = 4 * dayNumber + 139361631;
+    value = value + integerDivision(integerDivision(4 * dayNumber + 183187720, 146097) * 3, 4) * 4 - 3908;
+    var calculation = integerDivision(remainder(value, 1461), 4) * 5 + 308;
+    var day = integerDivision(remainder(calculation, 153), 5) + 1;
+    var month = remainder(integerDivision(calculation, 153), 12) + 1;
+    var year = integerDivision(value, 1461) - 100100 + integerDivision(8 - month, 6);
+    return { year: year, month: month, day: day };
+  }
+
+  function jalaliToDayNumber(year, month, day) {
+    var calendar = jalaliCalendar(year);
+    return gregorianToDayNumber(calendar.gregorianYear, 3, calendar.march) +
+      (month - 1) * 31 - integerDivision(month, 7) * (month - 7) + day - 1;
+  }
+
+  function dayNumberToJalali(dayNumber) {
+    var gregorian = dayNumberToGregorian(dayNumber);
+    var year = gregorian.year - 621;
+    var calendar = jalaliCalendar(year);
+    var firstFarvardin = gregorianToDayNumber(gregorian.year, 3, calendar.march);
+    var offset = dayNumber - firstFarvardin;
+
+    if (offset >= 0) {
+      if (offset <= 185) {
+        return { year: year, month: 1 + integerDivision(offset, 31), day: remainder(offset, 31) + 1 };
+      }
+      offset -= 186;
+    } else {
+      year -= 1;
+      offset += 179;
+      if (calendar.leap === 1) {
+        offset += 1;
+      }
+    }
+
+    return { year: year, month: 7 + integerDivision(offset, 30), day: remainder(offset, 30) + 1 };
+  }
+
+  function gregorianToJalali(year, month, day) {
+    return dayNumberToJalali(gregorianToDayNumber(year, month, day));
+  }
+
+  function jalaliToGregorian(year, month, day) {
+    return dayNumberToGregorian(jalaliToDayNumber(year, month, day));
+  }
+
+  function jalaliMonthLength(year, month) {
+    if (month <= 6) {
+      return 31;
+    }
+    if (month <= 11) {
+      return 30;
+    }
+    return jalaliCalendar(year).leap === 0 ? 30 : 29;
+  }
+
+  function padNumber(value) {
+    return value < 10 ? '0' + value : String(value);
+  }
+
+  function jalaliDateString(year, month, day) {
+    return year + '/' + padNumber(month) + '/' + padNumber(day);
+  }
+
+  function parseJalaliDate(value) {
+    var match = normalizeDigits(value).match(/^(1[34][0-9]{2})\/(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])$/);
+    return match ? { year: parseInt(match[1], 10), month: parseInt(match[2], 10), day: parseInt(match[3], 10) } : null;
+  }
+
+  function todayJalali() {
+    var now = new Date();
+    return gregorianToJalali(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  }
+
+  function nextJalaliDay(date) {
+    return dayNumberToJalali(jalaliToDayNumber(date.year, date.month, date.day) + 1);
+  }
+
+  function databaseTimestampParts(value) {
+    var match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+    if (!match) {
+      return null;
+    }
+    var jalali = gregorianToJalali(parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10));
+    return {
+      date: jalaliDateString(jalali.year, jalali.month, jalali.day),
+      time: match[4] + ':' + match[5]
+    };
+  }
+
   function mount() {
     if (!document.body || document.getElementById(ROOT_ID)) {
       return;
@@ -149,7 +312,25 @@
               '<span>جزئیات و زمان‌بندی</span>' + icon('chevron') +
             '</button>' +
             '<div class="emcore-todo__details" aria-hidden="true">' +
-              '<label><span>موعد شمسی</span><div class="emcore-todo__field-icon">' + icon('calendar') + '<input name="due_date_fa" inputmode="numeric" maxlength="10" placeholder="۱۴۰۵/۰۵/۲۷"></div></label>' +
+              '<label class="emcore-todo__date-label"><span>موعد شمسی</span>' +
+                '<div class="emcore-todo__date-control">' +
+                  '<div class="emcore-todo__field-icon">' + icon('calendar') +
+                    '<input name="due_date_fa" data-action="calendar" inputmode="none" maxlength="10" placeholder="انتخاب روز" readonly aria-controls="emcore-todo-calendar" aria-expanded="false">' +
+                  '</div>' +
+                  '<button type="button" class="emcore-todo__date-clear" data-action="clear-date" aria-label="پاک کردن تاریخ" hidden>' + icon('close') + '</button>' +
+                  '<div class="emcore-todo__calendar" id="emcore-todo-calendar" role="dialog" aria-label="انتخاب تاریخ شمسی" hidden>' +
+                    '<div class="emcore-todo__calendar-head">' +
+                      '<button type="button" data-action="calendar-previous" aria-label="ماه قبل">' + icon('chevron') + '</button>' +
+                      '<strong data-calendar-title></strong>' +
+                      '<button type="button" data-action="calendar-next" aria-label="ماه بعد">' + icon('chevron') + '</button>' +
+                    '</div>' +
+                    '<div class="emcore-todo__calendar-weekdays" aria-hidden="true"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>' +
+                    '<div class="emcore-todo__calendar-days" role="grid"></div>' +
+                    '<div class="emcore-todo__calendar-foot"><button type="button" data-action="calendar-today">امروز</button><button type="button" data-action="clear-date">بدون تاریخ</button></div>' +
+                  '</div>' +
+                '</div>' +
+              '</label>' +
+              '<label><span>ساعت</span><div class="emcore-todo__field-icon emcore-todo__time-field">' + icon('clock') + '<input name="due_time" type="time" step="300" aria-label="ساعت موعد"></div></label>' +
               '<label><span>اولویت</span><select name="priority"><option value="1">عادی</option><option value="2">مهم</option><option value="0">کم</option></select></label>' +
               '<label class="emcore-todo__notes-label"><span>یادداشت</span><textarea name="notes" maxlength="2000" rows="2" placeholder="جزئیات اختیاری…"></textarea></label>' +
             '</div>' +
@@ -163,7 +344,7 @@
           '<div class="emcore-todo__list" role="list" aria-live="polite"></div>' +
           '<div class="emcore-todo__status" role="status" aria-live="polite"></div>' +
         '</div>' +
-        '<footer class="emcore-todo__footer"><span>فقط برای شما</span><span class="emcore-todo__privacy-dot"></span><span>نسخه ۰٫۲٫۰</span></footer>' +
+        '<footer class="emcore-todo__footer"><span>فقط برای شما</span><span class="emcore-todo__privacy-dot"></span><span>نسخه ۰٫۳٫۰</span></footer>' +
       '</section>' +
       '<button type="button" class="emcore-todo__trigger" aria-controls="emcore-todo-panel" aria-expanded="false" aria-label="باز کردن کارهای من">' +
         '<span class="emcore-todo__trigger-icon">' + icon('check') + '</span>' +
@@ -179,8 +360,14 @@
     var trigger = root.querySelector('.emcore-todo__trigger');
     var form = root.querySelector('.emcore-todo__composer');
     var titleInput = form.elements.title;
+    var dateInput = form.elements.due_date_fa;
+    var dueTimeInput = form.elements.due_time;
     var details = root.querySelector('.emcore-todo__details');
     var detailsToggle = root.querySelector('[data-action="details"]');
+    var calendar = root.querySelector('.emcore-todo__calendar');
+    var calendarDays = root.querySelector('.emcore-todo__calendar-days');
+    var calendarTitle = root.querySelector('[data-calendar-title]');
+    var dateClear = root.querySelector('.emcore-todo__date-clear');
     var list = root.querySelector('.emcore-todo__list');
     var status = root.querySelector('.emcore-todo__status');
     var toastTimer = null;
@@ -189,6 +376,90 @@
       return String(value).replace(/[0-9]/g, function (number) {
         return '۰۱۲۳۴۵۶۷۸۹'.charAt(parseInt(number, 10));
       });
+    }
+
+    function renderCalendar() {
+      var monthNames = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+      var selected = parseJalaliDate(dateInput.value);
+      var today = todayJalali();
+      var firstGregorian = jalaliToGregorian(state.calendarYear, state.calendarMonth, 1);
+      var firstWeekday = (new Date(firstGregorian.year, firstGregorian.month - 1, firstGregorian.day).getDay() + 1) % 7;
+      var daysInMonth = jalaliMonthLength(state.calendarYear, state.calendarMonth);
+      var day;
+      var blank;
+
+      calendarTitle.textContent = monthNames[state.calendarMonth - 1] + ' ' + toPersianNumber(state.calendarYear);
+      calendarDays.innerHTML = '';
+
+      for (blank = 0; blank < firstWeekday; blank += 1) {
+        var spacer = document.createElement('span');
+        spacer.className = 'emcore-todo__calendar-blank';
+        spacer.setAttribute('aria-hidden', 'true');
+        calendarDays.appendChild(spacer);
+      }
+
+      for (day = 1; day <= daysInMonth; day += 1) {
+        var button = document.createElement('button');
+        var dateValue = jalaliDateString(state.calendarYear, state.calendarMonth, day);
+        button.type = 'button';
+        button.textContent = toPersianNumber(day);
+        button.setAttribute('data-calendar-day', dateValue);
+        button.setAttribute('role', 'gridcell');
+        button.setAttribute('aria-label', toPersianNumber(dateValue));
+        if (selected && selected.year === state.calendarYear && selected.month === state.calendarMonth && selected.day === day) {
+          button.classList.add('is-selected');
+          button.setAttribute('aria-selected', 'true');
+        }
+        if (today.year === state.calendarYear && today.month === state.calendarMonth && today.day === day) {
+          button.classList.add('is-today');
+        }
+        calendarDays.appendChild(button);
+      }
+    }
+
+    function setCalendarOpen(open) {
+      state.calendarOpen = open;
+      calendar.hidden = !open;
+      dateInput.setAttribute('aria-expanded', open ? 'true' : 'false');
+      root.classList.toggle('is-calendar-open', open);
+      if (!open) {
+        return;
+      }
+
+      var selected = parseJalaliDate(dateInput.value) || todayJalali();
+      state.calendarYear = selected.year;
+      state.calendarMonth = selected.month;
+      renderCalendar();
+    }
+
+    function moveCalendarMonth(direction) {
+      state.calendarMonth += direction;
+      if (state.calendarMonth < 1) {
+        state.calendarMonth = 12;
+        state.calendarYear -= 1;
+      } else if (state.calendarMonth > 12) {
+        state.calendarMonth = 1;
+        state.calendarYear += 1;
+      }
+      renderCalendar();
+    }
+
+    function selectCalendarDate(dateValue) {
+      var parsed = parseJalaliDate(dateValue);
+      if (!parsed || parsed.day > jalaliMonthLength(parsed.year, parsed.month)) {
+        showToast('تاریخ انتخاب‌شده معتبر نیست', 'error');
+        return;
+      }
+      dateInput.value = toPersianNumber(jalaliDateString(parsed.year, parsed.month, parsed.day));
+      dateClear.hidden = false;
+      setCalendarOpen(false);
+    }
+
+    function clearScheduleDate() {
+      dateInput.value = '';
+      dueTimeInput.value = '';
+      dateClear.hidden = true;
+      setCalendarOpen(false);
     }
 
     function showToast(message, kind) {
@@ -205,6 +476,9 @@
       root.classList.toggle('is-open', open);
       panel.setAttribute('aria-hidden', open ? 'false' : 'true');
       trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open) {
+        setCalendarOpen(false);
+      }
       if (open) {
         if (!state.loaded && !state.loading) {
           loadTasks();
@@ -249,6 +523,70 @@
       return state.tasks.slice();
     }
 
+    function groupedTasks(tasks) {
+      var ordered = tasks.slice().sort(function (left, right) {
+        var leftDate = left.due_date_fa || '9999/99/99';
+        var rightDate = right.due_date_fa || '9999/99/99';
+        if (leftDate !== rightDate) {
+          return leftDate < rightDate ? -1 : 1;
+        }
+        if (left.is_completed !== right.is_completed) {
+          return left.is_completed - right.is_completed;
+        }
+        var leftTime = left.due_time || '99:99';
+        var rightTime = right.due_time || '99:99';
+        if (leftTime !== rightTime) {
+          return leftTime < rightTime ? -1 : 1;
+        }
+        if (left.priority !== right.priority) {
+          return right.priority - left.priority;
+        }
+        return right.id - left.id;
+      });
+      var groups = [];
+      var lookup = {};
+
+      ordered.forEach(function (task) {
+        var key = task.due_date_fa || 'unscheduled';
+        if (!lookup[key]) {
+          lookup[key] = { key: key, tasks: [] };
+          groups.push(lookup[key]);
+        }
+        lookup[key].tasks.push(task);
+      });
+      return groups;
+    }
+
+    function groupPresentation(key) {
+      if (key === 'unscheduled') {
+        return { label: 'بدون زمان‌بندی', caption: 'کارهای آزاد', className: 'is-unscheduled' };
+      }
+
+      var months = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+      var weekdays = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
+      var parsed = parseJalaliDate(key);
+      var today = todayJalali();
+      var tomorrow = nextJalaliDay(today);
+      var todayKey = jalaliDateString(today.year, today.month, today.day);
+      var tomorrowKey = jalaliDateString(tomorrow.year, tomorrow.month, tomorrow.day);
+      var gregorian = jalaliToGregorian(parsed.year, parsed.month, parsed.day);
+      var weekday = weekdays[new Date(gregorian.year, gregorian.month - 1, gregorian.day).getDay()];
+      var readable = weekday + '، ' + toPersianNumber(parsed.day) + ' ' + months[parsed.month - 1];
+      var label = readable;
+
+      if (key === todayKey) {
+        label = 'امروز';
+      } else if (key === tomorrowKey) {
+        label = 'فردا';
+      }
+
+      return {
+        label: label,
+        caption: key === todayKey || key === tomorrowKey ? readable : toPersianNumber(key),
+        className: key < todayKey ? 'is-overdue' : ''
+      };
+    }
+
     function taskElement(task) {
       var item = document.createElement('article');
       var priority = priorityMeta(task.priority);
@@ -287,9 +625,21 @@
         due.className = 'emcore-todo__due';
         due.innerHTML = icon('calendar');
         var dueText = document.createElement('b');
-        dueText.textContent = toPersianNumber(task.due_date_fa);
+        dueText.textContent = toPersianNumber(task.due_date_fa + (task.due_time ? ' • ' + task.due_time : ''));
         due.appendChild(dueText);
         meta.appendChild(due);
+      }
+      var timestamp = databaseTimestampParts(task.completed_at || task.created_at);
+      if (timestamp) {
+        var recorded = document.createElement('span');
+        recorded.className = 'emcore-todo__timestamp';
+        recorded.innerHTML = icon('clock');
+        var recordedText = document.createElement('b');
+        recordedText.textContent =
+          (task.completed_at ? 'انجام ' : 'ثبت ') +
+          toPersianNumber(timestamp.date + ' • ' + timestamp.time);
+        recorded.appendChild(recordedText);
+        meta.appendChild(recorded);
       }
       body.appendChild(meta);
 
@@ -330,8 +680,25 @@
         return;
       }
 
-      tasks.forEach(function (task) {
-        list.appendChild(taskElement(task));
+      groupedTasks(tasks).forEach(function (group, groupIndex) {
+        var presentation = groupPresentation(group.key);
+        var section = document.createElement('section');
+        var headingId = 'emcore-todo-group-' + groupIndex;
+        section.className = 'emcore-todo__group ' + presentation.className;
+        section.setAttribute('role', 'group');
+        section.setAttribute('aria-labelledby', headingId);
+        section.innerHTML =
+          '<header class="emcore-todo__group-head">' +
+            '<div><strong id="' + headingId + '">' + presentation.label + '</strong><span>' + presentation.caption + '</span></div>' +
+            '<b>' + toPersianNumber(group.tasks.length) + ' کار</b>' +
+          '</header>';
+        var groupBody = document.createElement('div');
+        groupBody.className = 'emcore-todo__group-body';
+        group.tasks.forEach(function (task) {
+          groupBody.appendChild(taskElement(task));
+        });
+        section.appendChild(groupBody);
+        list.appendChild(section);
       });
     }
 
@@ -362,6 +729,8 @@
       state.editingId = null;
       form.reset();
       form.elements.priority.value = '1';
+      dateClear.hidden = true;
+      setCalendarOpen(false);
       form.querySelector('.emcore-todo__submit span').textContent = 'افزودن';
       form.querySelector('.emcore-todo__edit-bar').hidden = true;
       titleInput.focus();
@@ -379,6 +748,8 @@
       form.elements.notes.value = task.notes || '';
       form.elements.priority.value = String(task.priority);
       form.elements.due_date_fa.value = task.due_date_fa ? toPersianNumber(task.due_date_fa) : '';
+      form.elements.due_time.value = task.due_time || '';
+      dateClear.hidden = !task.due_date_fa;
       form.querySelector('.emcore-todo__submit span').textContent = 'ذخیره';
       form.querySelector('.emcore-todo__edit-bar').hidden = false;
       openDetails(true);
@@ -406,7 +777,8 @@
         title: title,
         notes: form.elements.notes.value.trim(),
         priority: form.elements.priority.value,
-        due_date_fa: normalizeDigits(form.elements.due_date_fa.value)
+        due_date_fa: normalizeDigits(form.elements.due_date_fa.value),
+        due_time: normalizeDigits(form.elements.due_time.value)
       };
       var action = state.editingId ? 'update' : 'create';
       if (state.editingId) {
@@ -434,8 +806,15 @@
     root.addEventListener('click', function (event) {
       var actionButton = event.target.closest('[data-action]');
       var filterButton = event.target.closest('[data-filter]');
+      var dayButton = event.target.closest('[data-calendar-day]');
+
+      if (dayButton) {
+        selectCalendarDate(dayButton.getAttribute('data-calendar-day'));
+        return;
+      }
 
       if (filterButton) {
+        setCalendarOpen(false);
         state.filter = filterButton.getAttribute('data-filter');
         Array.prototype.forEach.call(root.querySelectorAll('[data-filter]'), function (button) {
           button.classList.toggle('is-active', button === filterButton);
@@ -452,6 +831,27 @@
       }
 
       var action = actionButton.getAttribute('data-action');
+      if (action === 'calendar') {
+        setCalendarOpen(!state.calendarOpen);
+        return;
+      }
+      if (action === 'calendar-previous') {
+        moveCalendarMonth(-1);
+        return;
+      }
+      if (action === 'calendar-next') {
+        moveCalendarMonth(1);
+        return;
+      }
+      if (action === 'calendar-today') {
+        var today = todayJalali();
+        selectCalendarDate(jalaliDateString(today.year, today.month, today.day));
+        return;
+      }
+      if (action === 'clear-date') {
+        clearScheduleDate();
+        return;
+      }
       if (action === 'close') {
         setOpen(false);
         return;
@@ -461,7 +861,11 @@
         return;
       }
       if (action === 'details') {
-        openDetails(detailsToggle.getAttribute('aria-expanded') !== 'true');
+        var openingDetails = detailsToggle.getAttribute('aria-expanded') !== 'true';
+        openDetails(openingDetails);
+        if (!openingDetails) {
+          setCalendarOpen(false);
+        }
         return;
       }
       if (action === 'cancel-edit') {
@@ -511,9 +915,18 @@
       }
     });
 
+    document.addEventListener('click', function (event) {
+      if (state.calendarOpen && !event.target.closest('.emcore-todo__date-control')) {
+        setCalendarOpen(false);
+      }
+    });
+
     document.addEventListener('keydown', function (event) {
       if ((event.key === 'Escape' || event.keyCode === 27) && trigger.getAttribute('aria-expanded') === 'true') {
-        if (state.editingId) {
+        if (state.calendarOpen) {
+          setCalendarOpen(false);
+          dateInput.focus();
+        } else if (state.editingId) {
           resetForm();
         } else {
           setOpen(false);

@@ -145,7 +145,18 @@ final class EmcoreTodoRepository
 
     public static function ensureSchema()
     {
-        self::connection()->execute(self::schemaSql());
+        $database = self::connection();
+        $database->execute(self::schemaSql());
+
+        $dueTime = $database->selectOne(
+            "SHOW COLUMNS FROM " . self::TABLE . " LIKE :column_name",
+            [':column_name' => 'due_time']
+        );
+        if (!$dueTime) {
+            $database->execute(
+                "ALTER TABLE " . self::TABLE . " ADD COLUMN due_time CHAR(5) NULL AFTER due_date_fa"
+            );
+        }
     }
 
     public static function schemaSql()
@@ -157,6 +168,7 @@ final class EmcoreTodoRepository
             notes TEXT NULL,
             priority TINYINT UNSIGNED NOT NULL DEFAULT 1,
             due_date_fa CHAR(10) NULL,
+            due_time CHAR(5) NULL,
             is_completed TINYINT(1) NOT NULL DEFAULT 0,
             sort_order INT NOT NULL DEFAULT 0,
             completed_at DATETIME NULL,

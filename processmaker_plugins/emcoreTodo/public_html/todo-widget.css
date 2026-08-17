@@ -188,6 +188,10 @@
   background: rgba(255, 254, 249, .76);
 }
 
+.emcore-todo.is-calendar-open .emcore-todo__composer {
+  z-index: 4;
+}
+
 .emcore-todo__capture {
   display: flex;
   gap: 7px;
@@ -282,7 +286,7 @@
 }
 
 .emcore-todo__details.is-visible {
-  max-height: 260px;
+  max-height: 310px;
   padding-top: 10px;
   opacity: 1;
 }
@@ -343,6 +347,180 @@
   padding-right: 31px;
   direction: ltr;
   text-align: right;
+}
+
+.emcore-todo__date-label {
+  grid-column: 1 / -1;
+}
+
+.emcore-todo__date-control {
+  position: relative;
+}
+
+.emcore-todo__date-control .emcore-todo__field-icon input {
+  padding-left: 34px;
+  cursor: pointer;
+}
+
+.emcore-todo__date-clear {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 2;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: #879087;
+  background: transparent;
+}
+
+.emcore-todo__date-clear[hidden] {
+  display: none;
+}
+
+.emcore-todo__date-clear:hover {
+  color: var(--emcore-danger);
+  background: rgba(179, 71, 63, .08);
+}
+
+.emcore-todo__date-clear svg {
+  width: 14px;
+  height: 14px;
+}
+
+.emcore-todo__time-field input {
+  direction: ltr;
+  text-align: right;
+}
+
+.emcore-todo__calendar {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 30;
+  width: min(292px, calc(100vw - 74px));
+  padding: 10px;
+  border: 1px solid rgba(23, 55, 47, .2);
+  border-radius: 12px;
+  color: var(--emcore-ink-deep);
+  background:
+    repeating-linear-gradient(0deg, rgba(23, 55, 47, .018) 0, rgba(23, 55, 47, .018) 1px, transparent 1px, transparent 5px),
+    var(--emcore-paper-light);
+  box-shadow: 0 17px 38px rgba(10, 35, 29, .22), 0 2px 8px rgba(10, 35, 29, .1);
+}
+
+.emcore-todo__calendar[hidden] {
+  display: none;
+}
+
+.emcore-todo__calendar-head {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.emcore-todo__calendar-head strong {
+  color: var(--emcore-ink);
+  font-size: 12px;
+  text-align: center;
+}
+
+.emcore-todo__calendar-head button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  color: var(--emcore-muted);
+  background: transparent;
+}
+
+.emcore-todo__calendar-head button:hover {
+  color: var(--emcore-ink);
+  background: rgba(45, 138, 98, .09);
+}
+
+.emcore-todo__calendar-head button:first-child svg {
+  transform: rotate(-90deg);
+}
+
+.emcore-todo__calendar-head button:last-child svg {
+  transform: rotate(90deg);
+}
+
+.emcore-todo__calendar-weekdays,
+.emcore-todo__calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.emcore-todo__calendar-weekdays {
+  margin-bottom: 4px;
+  color: #929991;
+  font-size: 9px;
+  text-align: center;
+}
+
+.emcore-todo__calendar-days button,
+.emcore-todo__calendar-blank {
+  aspect-ratio: 1;
+}
+
+.emcore-todo__calendar-days button {
+  display: grid;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--emcore-ink-deep);
+  background: transparent;
+  font-size: 10px;
+}
+
+.emcore-todo__calendar-days button:hover {
+  border-color: rgba(45, 138, 98, .22);
+  background: rgba(45, 138, 98, .08);
+}
+
+.emcore-todo__calendar-days button.is-today {
+  border-color: var(--emcore-leaf);
+  color: var(--emcore-leaf);
+  font-weight: 700;
+}
+
+.emcore-todo__calendar-days button.is-selected {
+  border-color: var(--emcore-leaf);
+  color: #fff;
+  background: var(--emcore-leaf);
+  box-shadow: 0 3px 9px rgba(45, 138, 98, .22);
+}
+
+.emcore-todo__calendar-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(217, 216, 204, .78);
+}
+
+.emcore-todo__calendar-foot button {
+  padding: 3px 6px;
+  border: 0;
+  color: var(--emcore-leaf);
+  background: transparent;
+  font-size: 10px;
+}
+
+.emcore-todo__calendar-foot button:last-child {
+  color: var(--emcore-muted);
 }
 
 .emcore-todo__notes-label {
@@ -425,13 +603,74 @@
   scrollbar-width: thin;
 }
 
+.emcore-todo__group {
+  margin-top: 8px;
+}
+
+.emcore-todo__group:first-child {
+  margin-top: 3px;
+}
+
+.emcore-todo__group-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px 3px;
+  border-bottom: 1px solid rgba(23, 55, 47, .1);
+}
+
+.emcore-todo__group-head > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.emcore-todo__group-head strong {
+  color: var(--emcore-ink);
+  font-size: 11px;
+}
+
+.emcore-todo__group-head span {
+  overflow: hidden;
+  color: #929991;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emcore-todo__group-head > b {
+  flex: 0 0 auto;
+  color: #969d96;
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.emcore-todo__group.is-overdue .emcore-todo__group-head {
+  border-bottom-color: rgba(179, 71, 63, .18);
+}
+
+.emcore-todo__group.is-overdue .emcore-todo__group-head strong {
+  color: var(--emcore-danger);
+}
+
+.emcore-todo__group.is-unscheduled .emcore-todo__group-head strong {
+  color: var(--emcore-muted);
+}
+
+.emcore-todo__group-body {
+  display: grid;
+  gap: 5px;
+}
+
 .emcore-todo__task {
   position: relative;
   display: grid;
   grid-template-columns: 31px minmax(0, 1fr) auto;
   gap: 9px;
   align-items: start;
-  margin-top: 5px;
+  margin-top: 0;
   padding: 11px 9px 10px;
   border: 1px solid transparent;
   border-radius: 11px;
@@ -534,7 +773,8 @@
 }
 
 .emcore-todo__priority,
-.emcore-todo__due {
+.emcore-todo__due,
+.emcore-todo__timestamp {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -564,14 +804,20 @@
   background: #8c9da5;
 }
 
-.emcore-todo__due svg {
+.emcore-todo__due svg,
+.emcore-todo__timestamp svg {
   width: 13px;
   height: 13px;
 }
 
-.emcore-todo__due b {
+.emcore-todo__due b,
+.emcore-todo__timestamp b {
   direction: ltr;
   font-weight: 400;
+}
+
+.emcore-todo__timestamp {
+  color: #899089;
 }
 
 .emcore-todo__task-actions {
@@ -836,6 +1082,14 @@
   .emcore-todo__task-actions {
     opacity: 1;
     transform: none;
+  }
+
+  .emcore-todo__details.is-visible {
+    max-height: 330px;
+  }
+
+  .emcore-todo__calendar {
+    width: min(292px, calc(100vw - 58px));
   }
 }
 

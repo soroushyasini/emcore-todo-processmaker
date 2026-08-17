@@ -8,7 +8,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$version = "0.2.1"
+$version = "0.3.0"
 $pluginSource = $PSScriptRoot
 $sourceEntrypoint = Join-Path $pluginSource "emcoreTodo.php"
 $sourceDirectory = Join-Path $pluginSource "emcoreTodo"
@@ -117,4 +117,4 @@ $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
 
 Write-Host "EMCORE Todo $version deployed successfully." -ForegroundColor Green
 Write-Host "Backup: $backupDirectory"
-Write-Host "Next: disable and re-enable EMCORE Todo so ProcessMaker creates the Todo table, then press Ctrl+F5."
+Write-Host "Next: disable and re-enable EMCORE Todo so ProcessMaker upgrades the Todo schema, then press Ctrl+F5."

@@ -157,6 +157,27 @@ function emcore_todo_due_date()
     return $value;
 }
 
+function emcore_todo_due_time()
+{
+    $value = isset($_POST['due_time']) ? trim((string)$_POST['due_time']) : '';
+    if ($value === '') {
+        return null;
+    }
+
+    $value = strtr($value, [
+        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+        '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+        '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+    ]);
+
+    if (!preg_match('/^([01]?[0-9]|2[0-3]):([0-5][0-9])$/', $value, $matches)) {
+        throw new EmcoreTodoHttpException(422, 'زمان باید با قالب ۰۸:۳۰ وارد شود');
+    }
+
+    return sprintf('%02d:%02d', (int)$matches[1], (int)$matches[2]);
+}
+
 function emcore_todo_completed()
 {
     $value = isset($_POST['completed']) ? strtolower(trim((string)$_POST['completed'])) : '';
@@ -172,7 +193,7 @@ function emcore_todo_completed()
 function emcore_todo_fetch($db, $id, $usrUid)
 {
     $task = $db->selectOne(
-        "SELECT id, title, notes, priority, due_date_fa, is_completed,
+        "SELECT id, title, notes, priority, due_date_fa, due_time, is_completed,
                 sort_order, completed_at, created_at, updated_at
          FROM " . EmcoreTodoRepository::TABLE . "
          WHERE id = :id AND usr_uid = :usr_uid AND deleted_at IS NULL
@@ -196,13 +217,14 @@ $action = emcore_todo_action();
 
 if ($action === 'list') {
     $tasks = $db->selectAll(
-        "SELECT id, title, notes, priority, due_date_fa, is_completed,
+        "SELECT id, title, notes, priority, due_date_fa, due_time, is_completed,
                 sort_order, completed_at, created_at, updated_at
          FROM " . EmcoreTodoRepository::TABLE . "
          WHERE usr_uid = :usr_uid AND deleted_at IS NULL
          ORDER BY is_completed ASC,
                   CASE WHEN due_date_fa IS NULL THEN 1 ELSE 0 END ASC,
                   due_date_fa ASC,
+                  due_time ASC,
                   priority DESC,
                   sort_order ASC,
                   id DESC
@@ -235,18 +257,20 @@ if ($action === 'create') {
     $notes = emcore_todo_text('notes', false, 2000);
     $priority = emcore_todo_priority();
     $dueDate = emcore_todo_due_date();
+    $dueTime = emcore_todo_due_time();
 
     $id = $db->insert(
         "INSERT INTO " . EmcoreTodoRepository::TABLE . "
-            (usr_uid, title, notes, priority, due_date_fa, is_completed, sort_order)
+            (usr_uid, title, notes, priority, due_date_fa, due_time, is_completed, sort_order)
          VALUES
-            (:usr_uid, :title, :notes, :priority, :due_date_fa, 0, 0)",
+            (:usr_uid, :title, :notes, :priority, :due_date_fa, :due_time, 0, 0)",
         [
             ':usr_uid' => $usrUid,
             ':title' => $title,
             ':notes' => $notes,
             ':priority' => $priority,
             ':due_date_fa' => $dueDate,
+            ':due_time' => $dueDate === null ? null : $dueTime,
         ]
     );
     emcore_todo_json(['success' => true, 'data' => emcore_todo_fetch($db, $id, $usrUid)], 201);
@@ -293,6 +317,7 @@ $title = emcore_todo_text('title', true, 255);
 $notes = emcore_todo_text('notes', false, 2000);
 $priority = emcore_todo_priority();
 $dueDate = emcore_todo_due_date();
+$dueTime = emcore_todo_due_time();
 
 $affected = $db->execute(
     "UPDATE " . EmcoreTodoRepository::TABLE . "
@@ -300,6 +325,7 @@ $affected = $db->execute(
          notes = :notes,
          priority = :priority,
          due_date_fa = :due_date_fa,
+         due_time = :due_time,
          updated_at = NOW()
      WHERE id = :id AND usr_uid = :usr_uid AND deleted_at IS NULL",
     [
@@ -307,6 +333,7 @@ $affected = $db->execute(
         ':notes' => $notes,
         ':priority' => $priority,
         ':due_date_fa' => $dueDate,
+        ':due_time' => $dueDate === null ? null : $dueTime,
         ':id' => $id,
         ':usr_uid' => $usrUid,
     ]

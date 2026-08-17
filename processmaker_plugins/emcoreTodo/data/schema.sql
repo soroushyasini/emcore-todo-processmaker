@@ -1,4 +1,4 @@
--- EMCORE Todo 0.2.1
+-- EMCORE Todo 0.3.0
 -- The plugin install/enable lifecycle executes this idempotent schema.
 
 CREATE TABLE IF NOT EXISTS emcore_todo_tasks (
@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS emcore_todo_tasks (
     notes TEXT NULL,
     priority TINYINT UNSIGNED NOT NULL DEFAULT 1,
     due_date_fa CHAR(10) NULL,
+    due_time CHAR(5) NULL,
     is_completed TINYINT(1) NOT NULL DEFAULT 0,
     sort_order INT NOT NULL DEFAULT 0,
     completed_at DATETIME NULL,
