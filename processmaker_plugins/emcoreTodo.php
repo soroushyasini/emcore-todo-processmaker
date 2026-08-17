@@ -19,15 +19,15 @@ class emcoreTodoPlugin extends PMPlugin
         $this->sDescription = 'Private personal todo module for EMCORE';
         $this->sPluginFolder = 'emcoreTodo';
         $this->sSetupPage = '';
-        $this->iVersion = '0.1.0';
+        $this->iVersion = '0.1.1';
         $this->aWorkspaces = null;
         return $result;
     }
 
     public function setup()
     {
-        // ProcessMaker's shared publisher resolves this to
-        // workflow/engine/plugins/emcoreTodo/todoWidget.js.
+        // Standard ProcessMaker pages consume this copy of the widget.
+        // The custom interface renderer uses the separately deployed bridge.
         $publisher = &headPublisher::getSingleton();
         $publisher->addExtJsScript('emcoreTodo/todoWidget', false);
     }
