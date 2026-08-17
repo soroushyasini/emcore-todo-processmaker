@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dynaForm
+  name="EMCORE Todo"
+  type="xmlform"
+  labelwidth="200"
+  width="600"
+>
+  <TITLE type="title" group="1">
+    <en>EMCORE Todo</en>
+  </TITLE>
+  <DESCRIPTION type="caption" enableHTML="0">
+    <en>Private personal todo module for EMCORE.</en>
+  </DESCRIPTION>
+</dynaForm>
+
