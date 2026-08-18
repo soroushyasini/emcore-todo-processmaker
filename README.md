@@ -1,4 +1,4 @@
-# EMCORE Todo 0.3.0
+# EMCORE Todo 0.3.1
 
 EMCORE Todo is a private, self-managed task list for authenticated ProcessMaker
 3.8 users. It appears as a floating launcher throughout the custom EMCORE
@@ -7,7 +7,7 @@ interface and keeps every task scoped to the current ProcessMaker USR_UID.
 ## Phase 3 capabilities
 
 - create, edit, complete, reopen, and soft-delete personal tasks;
-- dependency-free inline Shamsi date picker and optional due time;
+- floating Shamsi calendar and analog clock picker with a one-hour suggestion;
 - day-based task groups for today, tomorrow, overdue, and unscheduled work;
 - visible due and created/completed timestamps on each task;
 - optional priority and notes;
@@ -59,13 +59,13 @@ git pull --ff-only
 
 The deployment script supports an existing 0.1.1 deployment. It creates a new
 timestamped backup, preserves the preceding rollback state, copies version
-0.3.0, and updates only the marked loader block.
+0.3.1, and updates only the marked loader block.
 
 After deployment:
 
 1. Open **Admin > Plugins > Plugins Manager**.
 2. Disable and re-enable **EMCORE Todo**.
-3. Confirm the plugin version is 0.3.0.
+3. Confirm the plugin version is 0.3.1.
 4. Sign in as a regular user and press Ctrl+F5.
 5. Open **کارهای من** and create a test task.
 
@@ -92,8 +92,8 @@ marked loader
 Browser assets:
 
 ~~~text
-/plugin/emcoreTodo/todoWidget.js?v=0.3.0
-/plugin/emcoreTodo/todo-widget.css?v=0.3.0
+/plugin/emcoreTodo/todoWidget.js?v=0.3.1
+/plugin/emcoreTodo/todo-widget.css?v=0.3.1
 ~~~
 
 Workspace API route:

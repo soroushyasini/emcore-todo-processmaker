@@ -357,7 +357,8 @@
   position: relative;
 }
 
-.emcore-todo__date-control .emcore-todo__field-icon input {
+.emcore-todo__date-control .emcore-todo__field-icon input,
+.emcore-todo__time-control .emcore-todo__field-icon input {
   padding-left: 34px;
   cursor: pointer;
 }
@@ -392,28 +393,75 @@
   height: 14px;
 }
 
+.emcore-todo__time-control {
+  position: relative;
+}
+
 .emcore-todo__time-field input {
   direction: ltr;
   text-align: right;
 }
 
-.emcore-todo__calendar {
-  position: absolute;
-  top: calc(100% + 7px);
-  right: 0;
-  z-index: 30;
-  width: min(292px, calc(100vw - 74px));
-  padding: 10px;
-  border: 1px solid rgba(23, 55, 47, .2);
-  border-radius: 12px;
+.emcore-todo__time-field input::placeholder {
+  color: #a2a8a1;
+  opacity: 1;
+}
+
+.emcore-todo__calendar,
+.emcore-todo__time-picker {
+  --emcore-popover-arrow: 50%;
+  position: fixed;
+  z-index: 120;
   color: var(--emcore-ink-deep);
   background:
     repeating-linear-gradient(0deg, rgba(23, 55, 47, .018) 0, rgba(23, 55, 47, .018) 1px, transparent 1px, transparent 5px),
     var(--emcore-paper-light);
-  box-shadow: 0 17px 38px rgba(10, 35, 29, .22), 0 2px 8px rgba(10, 35, 29, .1);
+  box-shadow: 0 20px 52px rgba(10, 35, 29, .28), 0 3px 10px rgba(10, 35, 29, .12);
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .75));
 }
 
-.emcore-todo__calendar[hidden] {
+.emcore-todo__calendar::before,
+.emcore-todo__time-picker::before {
+  position: absolute;
+  left: calc(var(--emcore-popover-arrow) - 6px);
+  z-index: 0;
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(23, 55, 47, .16);
+  background: var(--emcore-paper-light);
+  content: "";
+  transform: rotate(45deg);
+}
+
+.emcore-todo__calendar[data-placement="below"]::before,
+.emcore-todo__time-picker[data-placement="below"]::before {
+  top: -7px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.emcore-todo__calendar[data-placement="above"]::before,
+.emcore-todo__time-picker[data-placement="above"]::before {
+  bottom: -7px;
+  border-top: 0;
+  border-left: 0;
+}
+
+.emcore-todo__calendar:not([hidden]),
+.emcore-todo__time-picker:not([hidden]) {
+  animation: emcore-todo-popover-in .16s cubic-bezier(.2, .8, .2, 1);
+  transform-origin: var(--emcore-popover-arrow) center;
+}
+
+.emcore-todo__calendar {
+  width: min(292px, calc(100vw - 74px));
+  padding: 10px;
+  border: 1px solid rgba(23, 55, 47, .2);
+  border-radius: 12px;
+}
+
+.emcore-todo__calendar[hidden],
+.emcore-todo__time-picker[hidden] {
   display: none;
 }
 
@@ -521,6 +569,201 @@
 
 .emcore-todo__calendar-foot button:last-child {
   color: var(--emcore-muted);
+}
+
+.emcore-todo__time-picker {
+  width: min(278px, calc(100vw - 28px));
+  overflow: visible;
+  border: 1px solid rgba(23, 55, 47, .2);
+  border-radius: 15px;
+}
+
+.emcore-todo__time-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 14px 14px 0 0;
+  color: #f6f4eb;
+  background:
+    linear-gradient(112deg, rgba(255, 255, 255, .045) 0 1px, transparent 1px 12px),
+    linear-gradient(135deg, var(--emcore-ink-deep), var(--emcore-ink));
+}
+
+.emcore-todo__time-display {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: rgba(255, 255, 255, .58);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.emcore-todo__time-display button {
+  min-width: 42px;
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, .72);
+  background: transparent;
+  line-height: 1;
+}
+
+.emcore-todo__time-display button.is-active {
+  color: #fff;
+  background: rgba(71, 185, 130, .26);
+  box-shadow: inset 0 -2px 0 var(--emcore-leaf-bright);
+}
+
+.emcore-todo__period {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .12);
+}
+
+.emcore-todo__period button {
+  min-width: 34px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, .58);
+  background: transparent;
+  font-size: 9px;
+}
+
+.emcore-todo__period button.is-active {
+  color: var(--emcore-ink-deep);
+  background: var(--emcore-leaf-bright);
+  font-weight: 700;
+}
+
+.emcore-todo__clock-face {
+  position: relative;
+  width: 204px;
+  height: 204px;
+  margin: 12px auto 10px;
+  border: 1px solid rgba(23, 55, 47, .13);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, rgba(45, 138, 98, .09) 0 4px, transparent 5px),
+    radial-gradient(circle at center, transparent 0 63%, rgba(23, 55, 47, .035) 64% 65%, transparent 66%),
+    linear-gradient(145deg, #fffef9, #eeede5);
+  box-shadow: inset 0 2px 8px rgba(23, 55, 47, .06), 0 4px 12px rgba(23, 55, 47, .05);
+}
+
+.emcore-todo__clock-face::after {
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed rgba(45, 138, 98, .12);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.emcore-todo__clock-face button {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: var(--emcore-ink-deep);
+  background: rgba(255, 254, 249, .82);
+  font-size: 10px;
+  transform: translate(-50%, -50%);
+  transition: color .14s, background .14s, border-color .14s, box-shadow .14s;
+}
+
+.emcore-todo__clock-face button:hover {
+  border-color: rgba(45, 138, 98, .28);
+  color: var(--emcore-leaf);
+  background: #fff;
+}
+
+.emcore-todo__clock-face button.is-selected {
+  border-color: var(--emcore-leaf);
+  color: #fff;
+  background: var(--emcore-leaf);
+  box-shadow: 0 3px 9px rgba(45, 138, 98, .25);
+}
+
+.emcore-todo__clock-hand {
+  position: absolute;
+  bottom: 50%;
+  left: calc(50% - 1px);
+  z-index: 1;
+  width: 2px;
+  height: 68px;
+  border-radius: 999px;
+  background: linear-gradient(to top, var(--emcore-leaf), var(--emcore-leaf-bright));
+  box-shadow: 0 0 0 1px rgba(45, 138, 98, .05);
+  transform-origin: 50% 100%;
+  transition: transform .22s cubic-bezier(.2, .8, .2, 1);
+}
+
+.emcore-todo__clock-hand::before {
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--emcore-leaf-bright);
+  content: "";
+}
+
+.emcore-todo__clock-pin {
+  position: absolute;
+  top: calc(50% - 5px);
+  left: calc(50% - 5px);
+  z-index: 4;
+  width: 10px;
+  height: 10px;
+  border: 3px solid var(--emcore-paper-light);
+  border-radius: 50%;
+  background: var(--emcore-leaf);
+  box-shadow: 0 0 0 1px rgba(23, 55, 47, .16);
+}
+
+.emcore-todo__time-foot {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 4px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid rgba(217, 216, 204, .78);
+}
+
+.emcore-todo__time-foot button {
+  min-height: 31px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--emcore-muted);
+  background: transparent;
+  font-size: 9px;
+}
+
+.emcore-todo__time-foot button:hover {
+  background: rgba(45, 138, 98, .08);
+}
+
+.emcore-todo__time-foot .emcore-todo__time-confirm {
+  padding-inline: 13px;
+  color: #fff;
+  background: var(--emcore-leaf);
+  font-weight: 700;
+}
+
+.emcore-todo__time-foot .emcore-todo__time-confirm:hover {
+  background: #237653;
 }
 
 .emcore-todo__notes-label {
@@ -1051,6 +1294,11 @@
 
 @keyframes emcore-todo-shimmer {
   to { background-position: -220% 0; }
+}
+
+@keyframes emcore-todo-popover-in {
+  from { opacity: 0; transform: translateY(4px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @media (max-width: 600px) {

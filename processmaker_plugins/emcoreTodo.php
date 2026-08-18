@@ -15,7 +15,7 @@ class emcoreTodoPlugin extends PMPlugin
         $this->sDescription = 'Private personal todo module for EMCORE';
         $this->sPluginFolder = 'emcoreTodo';
         $this->sSetupPage = '';
-        $this->iVersion = '0.3.0';
+        $this->iVersion = '0.3.1';
         $this->aWorkspaces = null;
         return $result;
     }

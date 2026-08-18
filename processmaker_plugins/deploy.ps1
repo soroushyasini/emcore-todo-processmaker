@@ -8,7 +8,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$version = "0.3.0"
+$version = "0.3.1"
 $pluginSource = $PSScriptRoot
 $sourceEntrypoint = Join-Path $pluginSource "emcoreTodo.php"
 $sourceDirectory = Join-Path $pluginSource "emcoreTodo"

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '0.3.0';
+  var VERSION = '0.3.1';
   var ROOT_ID = 'emcore-todo-proof';
   var CSS_ID = 'emcore-todo-css';
   var state = {
@@ -14,7 +14,11 @@
     editingId: null,
     calendarOpen: false,
     calendarYear: null,
-    calendarMonth: null
+    calendarMonth: null,
+    timePickerOpen: false,
+    timePickerMode: 'hour',
+    timeHour: null,
+    timeMinute: null
   };
 
   if (window.top !== window.self || window.__EMCORE_TODO_LOADED__) {
@@ -330,7 +334,34 @@
                   '</div>' +
                 '</div>' +
               '</label>' +
-              '<label><span>ساعت</span><div class="emcore-todo__field-icon emcore-todo__time-field">' + icon('clock') + '<input name="due_time" type="time" step="300" aria-label="ساعت موعد"></div></label>' +
+              '<label><span>ساعت</span>' +
+                '<div class="emcore-todo__time-control">' +
+                  '<div class="emcore-todo__field-icon emcore-todo__time-field">' + icon('clock') +
+                    '<input name="due_time" data-action="time-picker" type="text" inputmode="none" maxlength="5" readonly aria-controls="emcore-todo-time-picker" aria-expanded="false" aria-label="انتخاب ساعت موعد">' +
+                  '</div>' +
+                  '<button type="button" class="emcore-todo__date-clear emcore-todo__time-clear" data-action="clear-time" aria-label="پاک کردن ساعت" hidden>' + icon('close') + '</button>' +
+                  '<div class="emcore-todo__time-picker" id="emcore-todo-time-picker" role="dialog" aria-label="انتخاب ساعت" hidden>' +
+                    '<header class="emcore-todo__time-head">' +
+                      '<div class="emcore-todo__time-display" dir="ltr">' +
+                        '<button type="button" data-action="time-mode-hour" data-time-hour>--</button><span>:</span><button type="button" data-action="time-mode-minute" data-time-minute>--</button>' +
+                      '</div>' +
+                      '<div class="emcore-todo__period" aria-label="نیم‌روز">' +
+                        '<button type="button" data-action="time-am">ق.ظ</button>' +
+                        '<button type="button" data-action="time-pm">ب.ظ</button>' +
+                      '</div>' +
+                    '</header>' +
+                    '<div class="emcore-todo__clock-face" data-clock-face role="group" aria-label="صفحه ساعت">' +
+                      '<span class="emcore-todo__clock-hand" data-clock-hand aria-hidden="true"></span>' +
+                      '<span class="emcore-todo__clock-pin" aria-hidden="true"></span>' +
+                    '</div>' +
+                    '<footer class="emcore-todo__time-foot">' +
+                      '<button type="button" data-action="time-suggested">یک ساعت بعد</button>' +
+                      '<button type="button" data-action="clear-time">بدون ساعت</button>' +
+                      '<button type="button" class="emcore-todo__time-confirm" data-action="time-confirm">تأیید</button>' +
+                    '</footer>' +
+                  '</div>' +
+                '</div>' +
+              '</label>' +
               '<label><span>اولویت</span><select name="priority"><option value="1">عادی</option><option value="2">مهم</option><option value="0">کم</option></select></label>' +
               '<label class="emcore-todo__notes-label"><span>یادداشت</span><textarea name="notes" maxlength="2000" rows="2" placeholder="جزئیات اختیاری…"></textarea></label>' +
             '</div>' +
@@ -344,7 +375,7 @@
           '<div class="emcore-todo__list" role="list" aria-live="polite"></div>' +
           '<div class="emcore-todo__status" role="status" aria-live="polite"></div>' +
         '</div>' +
-        '<footer class="emcore-todo__footer"><span>فقط برای شما</span><span class="emcore-todo__privacy-dot"></span><span>نسخه ۰٫۳٫۰</span></footer>' +
+        '<footer class="emcore-todo__footer"><span>فقط برای شما</span><span class="emcore-todo__privacy-dot"></span><span>نسخه ۰٫۳٫۱</span></footer>' +
       '</section>' +
       '<button type="button" class="emcore-todo__trigger" aria-controls="emcore-todo-panel" aria-expanded="false" aria-label="باز کردن کارهای من">' +
         '<span class="emcore-todo__trigger-icon">' + icon('check') + '</span>' +
@@ -368,14 +399,165 @@
     var calendarDays = root.querySelector('.emcore-todo__calendar-days');
     var calendarTitle = root.querySelector('[data-calendar-title]');
     var dateClear = root.querySelector('.emcore-todo__date-clear');
+    var timePicker = root.querySelector('.emcore-todo__time-picker');
+    var timeFace = root.querySelector('[data-clock-face]');
+    var timeHourDisplay = root.querySelector('[data-time-hour]');
+    var timeMinuteDisplay = root.querySelector('[data-time-minute]');
+    var timeClear = root.querySelector('.emcore-todo__time-clear');
     var list = root.querySelector('.emcore-todo__list');
     var status = root.querySelector('.emcore-todo__status');
     var toastTimer = null;
+
+    root.appendChild(calendar);
+    root.appendChild(timePicker);
 
     function toPersianNumber(value) {
       return String(value).replace(/[0-9]/g, function (number) {
         return '۰۱۲۳۴۵۶۷۸۹'.charAt(parseInt(number, 10));
       });
+    }
+
+    function parseTime(value) {
+      var match = normalizeDigits(value).match(/^([01][0-9]|2[0-3]):([0-5][0-9])$/);
+      return match ? { hour: parseInt(match[1], 10), minute: parseInt(match[2], 10) } : null;
+    }
+
+    function timeString(parts) {
+      return padNumber(parts.hour) + ':' + padNumber(parts.minute);
+    }
+
+    function suggestedTime() {
+      var suggestion = new Date(Date.now() + 60 * 60 * 1000);
+      var roundedMinute = Math.round(suggestion.getMinutes() / 5) * 5;
+      if (roundedMinute === 60) {
+        suggestion.setHours(suggestion.getHours() + 1);
+        roundedMinute = 0;
+      }
+      return { hour: suggestion.getHours(), minute: roundedMinute };
+    }
+
+    function positionFloating(popup, anchor) {
+      var margin = 10;
+      var gap = 9;
+      var anchorRect = anchor.getBoundingClientRect();
+      var popupWidth = popup.offsetWidth;
+      var popupHeight = popup.offsetHeight;
+      var left = anchorRect.right - popupWidth;
+      var belowTop = anchorRect.bottom + gap;
+      var aboveTop = anchorRect.top - popupHeight - gap;
+      var placeBelow = belowTop + popupHeight <= window.innerHeight - margin || aboveTop < margin;
+      var top = placeBelow ? belowTop : aboveTop;
+
+      left = Math.max(margin, Math.min(left, window.innerWidth - popupWidth - margin));
+      top = Math.max(margin, Math.min(top, window.innerHeight - popupHeight - margin));
+      popup.style.left = Math.round(left) + 'px';
+      popup.style.top = Math.round(top) + 'px';
+      popup.style.setProperty(
+        '--emcore-popover-arrow',
+        Math.round(Math.max(18, Math.min(anchorRect.left + anchorRect.width / 2 - left, popupWidth - 18))) + 'px'
+      );
+      popup.setAttribute('data-placement', placeBelow ? 'below' : 'above');
+    }
+
+    function renderTimePicker() {
+      var existing = timeFace.querySelectorAll('[data-time-value]');
+      var selectedValue = state.timePickerMode === 'hour'
+        ? (state.timeHour % 12 || 12)
+        : state.timeMinute;
+      var values = [];
+      var index;
+
+      Array.prototype.forEach.call(existing, function (button) {
+        button.parentNode.removeChild(button);
+      });
+
+      if (state.timePickerMode === 'hour') {
+        for (index = 1; index <= 12; index += 1) {
+          values.push(index);
+        }
+      } else {
+        for (index = 0; index < 60; index += 5) {
+          values.push(index);
+        }
+      }
+
+      values.forEach(function (value) {
+        var angle = (state.timePickerMode === 'hour' ? value * 30 : value * 6) * Math.PI / 180;
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = toPersianNumber(state.timePickerMode === 'minute' ? padNumber(value) : value);
+        button.setAttribute('data-time-value', String(value));
+        button.setAttribute('aria-label', toPersianNumber(value));
+        button.style.left = (50 + Math.sin(angle) * 38) + '%';
+        button.style.top = (50 - Math.cos(angle) * 38) + '%';
+        if (value === selectedValue) {
+          button.className = 'is-selected';
+          button.setAttribute('aria-pressed', 'true');
+        }
+        timeFace.appendChild(button);
+      });
+
+      var displayHour = state.timeHour % 12 || 12;
+      timeHourDisplay.textContent = toPersianNumber(padNumber(displayHour));
+      timeMinuteDisplay.textContent = toPersianNumber(padNumber(state.timeMinute));
+      timeHourDisplay.classList.toggle('is-active', state.timePickerMode === 'hour');
+      timeMinuteDisplay.classList.toggle('is-active', state.timePickerMode === 'minute');
+      root.querySelector('[data-action="time-am"]').classList.toggle('is-active', state.timeHour < 12);
+      root.querySelector('[data-action="time-pm"]').classList.toggle('is-active', state.timeHour >= 12);
+
+      var handValue = state.timePickerMode === 'hour' ? (state.timeHour % 12) * 30 : state.timeMinute * 6;
+      root.querySelector('[data-clock-hand]').style.transform = 'rotate(' + handValue + 'deg)';
+      if (state.timePickerOpen) {
+        positionFloating(timePicker, dueTimeInput);
+      }
+    }
+
+    function setTimePickerOpen(open) {
+      state.timePickerOpen = open;
+      timePicker.hidden = !open;
+      dueTimeInput.setAttribute('aria-expanded', open ? 'true' : 'false');
+      root.classList.toggle('is-time-picker-open', open);
+      if (!open) {
+        return;
+      }
+
+      setCalendarOpen(false);
+      var liveSuggestion = suggestedTime();
+      dueTimeInput.placeholder = toPersianNumber(timeString(liveSuggestion));
+      dueTimeInput.title = 'پیشنهاد یک ساعت بعد: ' + toPersianNumber(timeString(liveSuggestion));
+      var selected = parseTime(dueTimeInput.value) || liveSuggestion;
+      state.timeHour = selected.hour;
+      state.timeMinute = selected.minute;
+      state.timePickerMode = 'hour';
+      renderTimePicker();
+    }
+
+    function selectClockValue(value) {
+      if (state.timePickerMode === 'hour') {
+        var isAfternoon = state.timeHour >= 12;
+        state.timeHour = value % 12 + (isAfternoon ? 12 : 0);
+        state.timePickerMode = 'minute';
+      } else {
+        state.timeMinute = value;
+      }
+      renderTimePicker();
+    }
+
+    function setTimePeriod(isAfternoon) {
+      state.timeHour = state.timeHour % 12 + (isAfternoon ? 12 : 0);
+      renderTimePicker();
+    }
+
+    function confirmTime() {
+      dueTimeInput.value = toPersianNumber(timeString({ hour: state.timeHour, minute: state.timeMinute }));
+      timeClear.hidden = false;
+      setTimePickerOpen(false);
+    }
+
+    function clearScheduleTime() {
+      dueTimeInput.value = '';
+      timeClear.hidden = true;
+      setTimePickerOpen(false);
     }
 
     function renderCalendar() {
@@ -415,9 +597,15 @@
         }
         calendarDays.appendChild(button);
       }
+      if (state.calendarOpen) {
+        positionFloating(calendar, dateInput);
+      }
     }
 
     function setCalendarOpen(open) {
+      if (open) {
+        setTimePickerOpen(false);
+      }
       state.calendarOpen = open;
       calendar.hidden = !open;
       dateInput.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -459,8 +647,14 @@
       dateInput.value = '';
       dueTimeInput.value = '';
       dateClear.hidden = true;
+      timeClear.hidden = true;
       setCalendarOpen(false);
+      setTimePickerOpen(false);
     }
+
+    var initialSuggestedTime = suggestedTime();
+    dueTimeInput.placeholder = toPersianNumber(timeString(initialSuggestedTime));
+    dueTimeInput.title = 'پیشنهاد یک ساعت بعد: ' + toPersianNumber(timeString(initialSuggestedTime));
 
     function showToast(message, kind) {
       var toast = root.querySelector('.emcore-todo__toast');
@@ -478,6 +672,7 @@
       trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
       if (!open) {
         setCalendarOpen(false);
+        setTimePickerOpen(false);
       }
       if (open) {
         if (!state.loaded && !state.loading) {
@@ -730,7 +925,9 @@
       form.reset();
       form.elements.priority.value = '1';
       dateClear.hidden = true;
+      timeClear.hidden = true;
       setCalendarOpen(false);
+      setTimePickerOpen(false);
       form.querySelector('.emcore-todo__submit span').textContent = 'افزودن';
       form.querySelector('.emcore-todo__edit-bar').hidden = true;
       titleInput.focus();
@@ -748,8 +945,9 @@
       form.elements.notes.value = task.notes || '';
       form.elements.priority.value = String(task.priority);
       form.elements.due_date_fa.value = task.due_date_fa ? toPersianNumber(task.due_date_fa) : '';
-      form.elements.due_time.value = task.due_time || '';
+      form.elements.due_time.value = task.due_time ? toPersianNumber(task.due_time) : '';
       dateClear.hidden = !task.due_date_fa;
+      timeClear.hidden = !task.due_time;
       form.querySelector('.emcore-todo__submit span').textContent = 'ذخیره';
       form.querySelector('.emcore-todo__edit-bar').hidden = false;
       openDetails(true);
@@ -807,14 +1005,20 @@
       var actionButton = event.target.closest('[data-action]');
       var filterButton = event.target.closest('[data-filter]');
       var dayButton = event.target.closest('[data-calendar-day]');
+      var timeValueButton = event.target.closest('[data-time-value]');
 
       if (dayButton) {
         selectCalendarDate(dayButton.getAttribute('data-calendar-day'));
         return;
       }
+      if (timeValueButton) {
+        selectClockValue(parseInt(timeValueButton.getAttribute('data-time-value'), 10));
+        return;
+      }
 
       if (filterButton) {
         setCalendarOpen(false);
+        setTimePickerOpen(false);
         state.filter = filterButton.getAttribute('data-filter');
         Array.prototype.forEach.call(root.querySelectorAll('[data-filter]'), function (button) {
           button.classList.toggle('is-active', button === filterButton);
@@ -833,6 +1037,44 @@
       var action = actionButton.getAttribute('data-action');
       if (action === 'calendar') {
         setCalendarOpen(!state.calendarOpen);
+        return;
+      }
+      if (action === 'time-picker') {
+        setTimePickerOpen(!state.timePickerOpen);
+        return;
+      }
+      if (action === 'time-mode-hour') {
+        state.timePickerMode = 'hour';
+        renderTimePicker();
+        return;
+      }
+      if (action === 'time-mode-minute') {
+        state.timePickerMode = 'minute';
+        renderTimePicker();
+        return;
+      }
+      if (action === 'time-am') {
+        setTimePeriod(false);
+        return;
+      }
+      if (action === 'time-pm') {
+        setTimePeriod(true);
+        return;
+      }
+      if (action === 'time-suggested') {
+        var suggested = suggestedTime();
+        state.timeHour = suggested.hour;
+        state.timeMinute = suggested.minute;
+        state.timePickerMode = 'hour';
+        renderTimePicker();
+        return;
+      }
+      if (action === 'time-confirm') {
+        confirmTime();
+        return;
+      }
+      if (action === 'clear-time') {
+        clearScheduleTime();
         return;
       }
       if (action === 'calendar-previous') {
@@ -865,6 +1107,7 @@
         openDetails(openingDetails);
         if (!openingDetails) {
           setCalendarOpen(false);
+          setTimePickerOpen(false);
         }
         return;
       }
@@ -916,8 +1159,27 @@
     });
 
     document.addEventListener('click', function (event) {
-      if (state.calendarOpen && !event.target.closest('.emcore-todo__date-control')) {
+      var eventPath = event.composedPath ? event.composedPath() : [];
+      var insideCalendar = eventPath.indexOf(calendar) !== -1 ||
+        !!event.target.closest('.emcore-todo__date-control');
+      var insideTimePicker = eventPath.indexOf(timePicker) !== -1 ||
+        !!event.target.closest('.emcore-todo__time-control');
+
+      if (state.calendarOpen &&
+          !insideCalendar) {
         setCalendarOpen(false);
+      }
+      if (state.timePickerOpen &&
+          !insideTimePicker) {
+        setTimePickerOpen(false);
+      }
+    });
+
+    window.addEventListener('resize', function () {
+      if (state.calendarOpen) {
+        positionFloating(calendar, dateInput);
+      } else if (state.timePickerOpen) {
+        positionFloating(timePicker, dueTimeInput);
       }
     });
 
@@ -926,6 +1188,9 @@
         if (state.calendarOpen) {
           setCalendarOpen(false);
           dateInput.focus();
+        } else if (state.timePickerOpen) {
+          setTimePickerOpen(false);
+          dueTimeInput.focus();
         } else if (state.editingId) {
           resetForm();
         } else {
