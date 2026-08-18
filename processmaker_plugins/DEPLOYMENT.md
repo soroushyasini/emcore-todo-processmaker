@@ -1,46 +1,84 @@
-# EMCORE Todo 0.1.1
+# EMCORE Todo 0.3.1
 
-EMCORE Todo is a separate ProcessMaker 3.8 plugin that proves a private Todo
-launcher can be displayed in the custom EMCORE interface. This phase does not
-create tables, store tasks, or call an API.
+EMCORE Todo is a private, self-managed task list for authenticated ProcessMaker
+3.8 users. It appears as a floating launcher throughout the custom EMCORE
+interface and keeps every task scoped to the current ProcessMaker USR_UID.
 
-The custom interface does not consume ProcessMaker's shared HeadPublisher
-queue. Version 0.1.1 therefore keeps the plugin independent and installs one
-small, marked loader in the interface's existing shared functions file.
+## Phase 3 capabilities
 
-## Automated deployment
+- create, edit, complete, reopen, and soft-delete personal tasks;
+- floating Shamsi calendar and analog clock picker with a one-hour suggestion;
+- day-based task groups for today, tomorrow, overdue, and unscheduled work;
+- visible due and created/completed timestamps on each task;
+- optional priority and notes;
+- open/all/completed filters and an outstanding-task badge;
+- same-origin ProcessMaker session authentication;
+- CSRF protection for every write;
+- prepared SQL with ownership enforced in every read and mutation;
+- responsive Persian RTL panel with no duplicate inside Dynaform iframes;
+- upgrade-safe deployment and reversible interface loader.
+
+“Private” means other normal ProcessMaker users cannot read or mutate another
+user's tasks through this module. Database administrators retain normal
+database-level access.
+
+## Architecture
+
+~~~text
+Authenticated ProcessMaker browser session
+        |
+        +-- /plugin/emcoreTodo/todoWidget.js
+        |
+        +-- POST /sys<workspace>/<lang>/<skin>/emcoreTodo/todoApi
+                    |
+                    +-- session USER_LOGGED
+                    +-- CSRF token
+                    +-- Propel workflow connection
+                    +-- emcore_todo_tasks (always filtered by usr_uid)
+~~~
+
+The custom interface renderer does not consume ProcessMaker's HeadPublisher
+queue. Deployment therefore maintains one marked loader inside the interface's
+shared functions.js; all Todo implementation remains in the separate plugin.
+
+## Upgrade or installation
 
 Open PowerShell as Administrator:
 
-```powershell
+~~~powershell
 Set-ExecutionPolicy -Scope Process Bypass
-Set-Location "F:\codebase\emcore-todo-processmaker\processmaker_plugins"
-.\deploy.ps1 -ProcessMakerEngine "C:\pmlearning\bpms\workflow\engine"
-```
+Set-Location "C:\pmlearning\emcore-todo-processmaker"
 
-The deployment script:
+git fetch origin
+git switch agent/private-todo-crud
+git pull --ff-only
 
-- validates all source and target paths;
-- refuses to run while an earlier deployment state is unresolved;
-- backs up the previous plugin and interface functions file;
-- copies `emcoreTodo.php` and the `emcoreTodo` directory;
-- appends an idempotent, marked loader to
-  `interface/public_html/assets/core/functions.js`;
-- records the backup location in
-  `plugins/.emcoreTodo-deployment.json`.
+.\processmaker_plugins\deploy.ps1 -ProcessMakerEngine "C:\pmlearning\bpms\workflow\engine" -WhatIf
+.\processmaker_plugins\deploy.ps1 -ProcessMakerEngine "C:\pmlearning\bpms\workflow\engine"
+~~~
 
-It never edits encoded PHP or ProcessMaker core files.
+The deployment script supports an existing 0.1.1 deployment. It creates a new
+timestamped backup, preserves the preceding rollback state, copies version
+0.3.1, and updates only the marked loader block.
 
-After it succeeds:
+After deployment:
 
 1. Open **Admin > Plugins > Plugins Manager**.
 2. Disable and re-enable **EMCORE Todo**.
-3. Sign in as a regular user and press `Ctrl+F5`.
-4. Confirm the green **کارهای من** launcher appears at the bottom-right.
+3. Confirm the plugin version is 0.3.1.
+4. Sign in as a regular user and press Ctrl+F5.
+5. Open **کارهای من** and create a test task.
 
-## Files deployed
+Re-enabling runs the idempotent schema installation and adds the nullable
+`due_time` column to an existing Todo table:
 
-```text
+~~~text
+emcore_todo_tasks
+~~~
+
+## Deployed files
+
+~~~text
 processmaker_plugins/emcoreTodo.php
   -> workflow/engine/plugins/emcoreTodo.php
 
@@ -49,53 +87,71 @@ processmaker_plugins/emcoreTodo/
 
 marked loader
   -> workflow/engine/plugins/interface/public_html/assets/core/functions.js
-```
+~~~
 
-The browser-facing assets are served from:
+Browser assets:
 
-```text
-/plugin/emcoreTodo/todoWidget.js?v=0.1.1
-/plugin/emcoreTodo/todo-widget.css?v=0.1.1
-```
+~~~text
+/plugin/emcoreTodo/todoWidget.js?v=0.3.1
+/plugin/emcoreTodo/todo-widget.css?v=0.3.1
+~~~
+
+Workspace API route:
+
+~~~text
+/sys<workspace>/<language>/<skin>/emcoreTodo/todoApi
+~~~
+
+## Security contract
+
+- The browser never supplies a user identifier.
+- The API derives identity exclusively from the ProcessMaker session.
+- Active identity is verified against ProcessMaker USERS.
+- Every task query includes usr_uid = :usr_uid.
+- Mutating actions require the session CSRF token.
+- Task values are bound through prepared statements.
+- UI rendering uses textContent for user-authored task text.
+- Deletes are soft deletes.
+- The plugin stores no ProcessMaker password or password hash.
 
 ## Acceptance checks
 
-Test the following pages in both available themes:
+Test with two different regular users:
 
-| Page | Expected result |
-|---|---|
-| Dashboard | One launcher in the outer page |
-| My Cases | One launcher in the outer page |
-| Open Case | One launcher outside the content iframe |
-| Dynaform iframe | No duplicate launcher |
-| Browser below 600px | Compact icon-only launcher |
-
-Also verify that Escape closes the panel and that Developer Tools shows HTTP
-200 for both browser-facing assets.
+1. User A creates a task.
+2. User B opens the Todo panel and cannot see User A's task.
+3. User B cannot edit, toggle, or delete User A's task by changing an ID.
+4. User A can edit, complete, reopen, and delete the task.
+5. Refreshing the page preserves the task.
+6. Dashboard, My Cases, Open Case, and both themes show one launcher.
+7. A Dynaform iframe does not show a second launcher.
+8. Narrow browser width shows the compact trigger and usable full-width panel.
+9. The Shamsi picker can select today, move between months, and clear a date.
+10. A saved due time returns after refresh and appears beside its due date.
+11. Tasks are grouped by due day, with unscheduled tasks in their own group.
+12. Created time is visible; completed tasks show their completion time.
 
 ## Rollback
 
-Disable **EMCORE Todo** in Plugins Manager first. Then run:
+Disable **EMCORE Todo**, then run:
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-Set-Location "F:\codebase\emcore-todo-processmaker\processmaker_plugins"
-.\rollback.ps1 -ProcessMakerEngine "C:\pmlearning\bpms\workflow\engine"
-```
+~~~powershell
+Set-Location "C:\pmlearning\emcore-todo-processmaker"
+.\processmaker_plugins\rollback.ps1 -ProcessMakerEngine "C:\pmlearning\bpms\workflow\engine"
+~~~
 
-Rollback restores the exact interface functions file and plugin files captured
-by the latest deployment. If the plugin did not exist before deployment, it is
-removed. The timestamped backup remains under:
+Rollback restores the previous plugin files, previous interface file, and
+previous deployment-state pointer. It intentionally preserves
+emcore_todo_tasks; code rollback never destroys personal task data.
 
-```text
+Timestamped backups remain under:
+
+~~~text
 workflow/engine/plugins/.emcoreTodo-backups/
-```
+~~~
 
-No database rollback is required because version 0.1.1 stores no data.
+## Database removal
 
-## Manual recovery
-
-If a deployment stops unexpectedly, do not run deployment again. Read
-`plugins/.emcoreTodo-deployment.json`, locate its `BackupDirectory`, and run
-`rollback.ps1`. The state file is written before plugin or interface files are
-changed, so rollback remains available after a partial deployment.
+Dropping emcore_todo_tasks is intentionally not automated. It is destructive
+and must only be performed through a separately reviewed database operation
+after an explicit data-retention decision.
